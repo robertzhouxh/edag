@@ -19,7 +19,11 @@
 -export([run_task/2]).
 -export([create_graph/2]).
 -export([start_graph/1, start_graph/3, stop_graph/1]).
--export([from_gdef/1]).
+-export([from_gdef/1
+	 , is_acyclic/1
+	 , reset_verts/1
+	 , ready_verts/1
+	 , vertex/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -63,7 +67,7 @@ stop_graph(GId) -> GId ! stop.
 
 run_task(GId, Task) -> gen_server:call(GId, {task, Task}).
 
-start_link(GId, GDef) -> 
+start_link(GId, GDef) ->
     gen_server:start_link({local, to_atom(GId)}, ?MODULE, [GId, GDef], []).
     %% gen_server:start_link({local, ?SERVER}, ?MODULE, [GId, GDef], []).
     %% gen_server:start_link(?MODULE, [GId, GDef], []).
@@ -83,7 +87,7 @@ handle_call({start, FlowMode, _FailMode}, _From, State=#state{graph = T, gid = G
 		   VVId = to_binary(VId),
 		   GGId = to_binary(GId),
 		   NVId = to_atom(<<GGId/binary, "-", VVId/binary>>),
-		   NAcc = 
+		   NAcc =
 		       case edag_vert:start_link(NVId, Vert, self()) of
 			   {ok, VPid}  -> child_started(Acc, VId, VPid);
 			   _Err -> Acc
@@ -115,16 +119,16 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Request, State) ->
     {noreply, State}.
 
-handle_info({trigger, VId}, State = #state{graph = T, waitverts = WaitVerts}) -> 
+handle_info({trigger, VId}, State = #state{graph = T, waitverts = WaitVerts}) ->
     NewWaits = lists:delete(VId, WaitVerts),
     T1 = child_done(T, VId),
-    Waits = 
+    Waits =
 	case NewWaits of
 	    [] -> trigger(T1, {nextverts, syn});
 	    _ -> NewWaits
 	end,
     case Waits of
-	[] -> 
+	[] ->
 	    reset_verts(T);
 	_Else -> ok
     end,
@@ -176,7 +180,7 @@ add_dependencies(T = #?T{}, [Vert | Rest]) ->
     Name = edag_vert:name(Vert),
     Deps = edag_vert:deps(Vert),
     case add_edges(T, Name, Deps) of
-        ok -> 
+        ok ->
 	    add_dependencies(T, Rest);
         {error, _} = Err -> Err
     end.
@@ -185,9 +189,9 @@ add_dependencies(T = #?T{}, [Vert | Rest]) ->
 add_edges(_T, _To, []) -> ok;
 add_edges(T = #?T{dag = Dag}, To, [From | Rest]) ->
     case digraph:add_edge(Dag, From, To) of
-        {error, _} = Err -> 
+        {error, _} = Err ->
 	    Err;
-        _ -> 
+        _ ->
 	    add_edges(T, To, Rest)
     end.
 
@@ -211,15 +215,15 @@ is_deps_done(T, Vert) ->
       end, edag_vert:deps(Vert)).
 
 -spec ready_verts(t()) -> [vert_t()].
-ready_verts(T = #?T{}) -> 
+ready_verts(T = #?T{}) ->
     lists:filter(
-      fun(VId) -> 
+      fun(VId) ->
 	      {_, Vert} = vertex(T, VId),
 	      edag_vert:is_idle(Vert) andalso is_deps_done(T, Vert)
       end, vertices(T)).
 
 -spec reset_verts(t()) -> [vert_t()].
-reset_verts(T = #?T{}) -> 
+reset_verts(T = #?T{}) ->
     lists:map(fun(VId) -> child_idle(T, VId) end, vertices(T)).
 
 %% -spec format(t()) -> string().
@@ -299,13 +303,13 @@ build_neighbours(#?T{dag = Dag, children = C}, VId, FlowMode) ->
 			 [Sub|Acc]
 		 end, [], OutNeighbours),
     {InPorts, OutPorts}.
-    
+
 trigger(#?T{children = C} = G, Cmd) ->
     ReadyVerts = ready_verts(G),
     lists:foreach(
       fun(VId) ->
 	      VPid = maps:get(VId, C),
-	      VPid ! Cmd 
+	      VPid ! Cmd
       end, ReadyVerts),
     ReadyVerts.
 
@@ -314,6 +318,7 @@ child_started(T = #?T{children = Children}, Name, Pid) ->
     Children2 = Children#{Name => Pid},
     T#?T{children = Children2}.
 
+is_acyclic(?T{dag = G}) -> digraph_utils:is_acyclic(G).
 is_finished(T) ->
     lists:all(fun(VertName) ->
         {VertName, Vert} = vertex(T, VertName),
@@ -330,6 +335,7 @@ child_done(T = #?T{}, VId) ->
     V1 = edag_vert:done(Vert),
     add_vertex(T, Name, V1),
     T.
+
 
 %% TODO:
 start_verts_or_exit(State = #state{graph = G}) ->
