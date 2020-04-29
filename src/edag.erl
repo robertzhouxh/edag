@@ -20,6 +20,7 @@
 -export([create_graph/2]).
 -export([start_graph/1, start_graph/3, stop_graph/1]).
 -export([from_gdef/1
+	 , destroy/1
 	 , is_acyclic/1
 	 , reset_verts/1
 	 , ready_verts/1
@@ -298,6 +299,9 @@ trigger(#?T{children = C} = G, Cmd) ->
 child_started(T = #?T{children = Children}, Name, Pid) ->
     Children2 = Children#{Name => Pid},
     T#?T{children = Children2}.
+
+
+destroy(#?T{dag = G}) -> digraph:delete(G).
 
 is_acyclic(#?T{dag = G}) -> digraph_utils:is_acyclic(G).
 is_finished(T) ->
