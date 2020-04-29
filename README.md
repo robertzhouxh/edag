@@ -23,7 +23,7 @@ Design
     in    +---------+                                      +---------+ out
    ----->>| vertex-1|                                      | vertex-7|------>>
           +---------+                                      +---------+
-		     \                                     /
+		             \                                     /
                       \  filter             filter        /
                        +---------+        +---------+    /
                        | vertex-3|------->| vertex-6|----
@@ -44,6 +44,48 @@ Design
  8. vertex-5,6 finished, and send the finish signal to the edag mangaer.
  9. edag manager pickout the final batch vertices, and send the run signal to the vertices[vertex7].
  10. vertex-10 finished and send finish signal to edag manager, the edag reset all the vervices to the idle status.
+
+How to Use?
+----------
+
+1. define your DAG, gid is the dag's global id
+```
+
+	node1-----> node2------>node3
+	|                         /|\
+	|       GDef1              |
+	|--------------------------|
+
+
+    GDef1 = #{<<"global">> => [#{<<"gid">> => <<"g_1">>}], 
+              <<"dag_orchestration">> => [
+	                                  #{
+	                                    <<"name">> => <<"node-1">>,
+	                                    <<"desc">> => <<"i am the first node">>,
+	                                    <<"deps">> => [],
+	                                    <<"module">> => <<"your-cb-module-to-process-the-input-data">>,
+	                                    <<"trans">> => #{}},
+
+	                                  #{<<"name">> => <<"node-2">>,
+	                                    <<"desc">> => <<"i am the secend node">>,
+	                                    <<"deps">> => [<<"node-1">>],
+	                                    <<"module">> => <<"your-cb-module-to-process-the-input-data">>,
+	                                    <<"trans">> => #{}},
+
+	                                  #{<<"name">> => <<"node-3">>,
+	                                    <<"desc">> => <<"i am the last node">>,
+	                                    <<"deps">> => [<<"node-1">>, <<"node-2">>],
+	                                    <<"module">> => <<"your-cb-module-to-process-the-input-data">>,
+	                                    <<"trans">> => #{}}
+	                                  ]}
+									  
+									  
+```
+
+2. realize your callback module with bebavior: edag_behaviour 
+3. edag:create_graph(GId, GDef)
+4. edag:start_graph(GId) or edag:start_graph(GId, FlowMode, FailMode)
+5. edag:run_task(GId, Task)
 
 Build
 -----
