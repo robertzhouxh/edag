@@ -1,8 +1,6 @@
 edag
 =====
-
-An OTP application
-
+    erlang DAG orchestratin lighe engine.
 Build
 -----
 

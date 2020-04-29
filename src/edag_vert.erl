@@ -73,7 +73,7 @@ start_link(VId, Vert, Parent) ->
 %% gen_server:start_link({local, ?MODULE}, ?MODULE, [VId, Vert, Parent], []).
 %% gen_server:start_link(?MODULE, [VId, Vert, Parent], []).
 
-start_node(Server, InPorts, OutPorts, FlowMode) -> 
+start_node(Server, InPorts, OutPorts, FlowMode) ->
     gen_server:call(Server, {start, InPorts, OutPorts, FlowMode}).
 
 %%%-------------------------------------------------------------------
@@ -84,8 +84,8 @@ init([VId, #?T{module = Mod} = Vert, Parent]) ->
 
 handle_call({start, InPorts, OutPorts, FlowMode}, _From, State=#state{component= Mod, vert=Vert}) ->
     {ok, NewCbState} = Mod:init(Vert),
-    {reply, ok, State#state{flow_mode = FlowMode, 
-			    outports = OutPorts, 
+    {reply, ok, State#state{flow_mode = FlowMode,
+			    outports = OutPorts,
 			    inports =  InPorts,
 			    cb_state = NewCbState}};
 
@@ -95,16 +95,16 @@ handle_call({request_pull, ReqVId}, _From, State=#state{outports = Subs}) ->
     {Reply, NSub} = handle_sync_request(Sub),
     NSubs = lists:keystore(ReqVId,2,Subs, NSub),
     {reply, Reply, State#state{outports=NSubs}};
-handle_call(_What, _From, State) -> 
+handle_call(_What, _From, State) ->
     {reply, State}.
 
-handle_cast(_Request, State) -> 
+handle_cast(_Request, State) ->
     {noreply, State}.
 
 %% receive the item value from the inport vertices, triggered by sync or async request_pull
-handle_info({item, Value}, State = 
-		#state{vid=VId,cb_state=CbState, 
-		       component=Mod, outports=Subs, 
+handle_info({item, Value}, State =
+		#state{vid=VId,cb_state=CbState,
+		       component=Mod, outports=Subs,
 		       flow_mode=_FMode, parent=Parent}) ->
     NewState =
 	case Mod:process(Value, CbState) of
@@ -129,19 +129,19 @@ handle_info({item, Value}, State =
     {noreply, NewState};
 
 %% send sync pull request and collect all the response from the publisher vertices
-handle_info({nextverts, syn}, 
+handle_info({nextverts, syn},
 	    State=#state{vid=VId,
-			 cb_state=CbState, 
-			 inports=InPorts, 
-			 component=Mod, 
-			 outports=Subs, 
+			 cb_state=CbState,
+			 inports=InPorts,
+			 component=Mod,
+			 outports=Subs,
 			 parent=Parent}) ->
     NAcc = lists:foldl(
-	    fun({PublisherId, VPid}, Acc) -> 
+	    fun({PublisherId, VPid}, Acc) ->
 		    ValFromPublisher = gen_server:call(VPid, {request_pull, VId}),
 		    [{PublisherId, ValFromPublisher}|Acc]
-	    end, [], InPorts), 
-    NState = 
+	    end, [], InPorts),
+    NState =
 	case Mod:process(NAcc, CbState) of
 	    {emit, Value, NCbState} ->
 		NewSubs = out_vert(Subs, Value),
@@ -158,20 +158,20 @@ handle_info({nextverts, syn},
 handle_info({nextverts, asyn}, State = #state{vid = NId, inports = InPorts}) ->
     lists:foreach(
       fun({_VId, VPid}) ->
-	      VPid ! {request_pull, self(), NId} 
+	      VPid ! {request_pull, self(), NId}
       end, InPorts),
     {noreply, State};
 
 %% receive asycn pull request, and publish the item value to the sender vertex
 handle_info({request_pull, ReqVPid, _ReqVId}, State = #state{outports = Subs}) ->
-    NewSubs = 
+    NewSubs =
 	lists:map(
-	  fun(Sub) -> 
+	  fun(Sub) ->
 		  handle_async_request(Sub,ReqVPid)
 	  end, Subs),
     {noreply, State#state{outports =  NewSubs}};
 
-%% push-mode 
+%% push-mode
 handle_info({emit, Value}, State = #state{outports = Subs, flow_mode = FMode, emitted = EmitCount}) ->
     NewSubs = out_vert(Subs, Value),
     NewState = State#state{outports = NewSubs},
@@ -187,29 +187,29 @@ handle_info(stop, State=#state{component = Mod, cb_state = CBState}) ->
 
 handle_info(_Req, State) -> {noreply, State}.
 
-terminate(_Reason, _State) -> 
+terminate(_Reason, _State) ->
     ok.
-code_change(_OldVsn, State, _Extra) -> 
+code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %%%--------------------------------------------------------------------------------
 %%% Internal functions
 
-handle_sync_request(Sub = #subscription{flow_mode = pull, out_buffer = Buffer}) -> 
+handle_sync_request(Sub = #subscription{flow_mode = pull, out_buffer = Buffer}) ->
     case queue:out(Buffer) of
-	{{value, Value}, Q2} -> 
+	{{value, Value}, Q2} ->
 	    {Value, Sub#subscription{out_buffer = Q2, pending = false}};
-	{empty, _Q1} -> 
+	{empty, _Q1} ->
 	    {undefined, Sub#subscription{pending = true}}
     end;
 handle_sync_request(Sub = #subscription{flow_mode = push}) -> {undefined, Sub}.
 
 handle_async_request(Sub = #subscription{flow_mode = pull,subpid = SubPid,out_buffer=Buffer},SubPid) ->
     case queue:out(Buffer) of
-	{{value, Value}, Q2} -> 
+	{{value, Value}, Q2} ->
 	    SubPid ! {item, Value},
 	    Sub#subscription{out_buffer = Q2, pending = false};
-	{empty, _Q1} -> 
+	{empty, _Q1} ->
 	    Sub#subscription{pending = true}
     end;
 handle_async_request(Sub = #subscription{flow_mode = pull}, _SubPid) -> Sub;
@@ -217,17 +217,17 @@ handle_async_request(Sub = #subscription{flow_mode = push}, _SubPid) -> Sub.
 
 out_vert(Subs, Value) when is_map(Subs) ->
     maps:fold(
-      fun({VId, Sub}, Acc) -> 
+      fun({VId, Sub}, Acc) ->
 	      Data = proplists:get_value(VId, Value),
 	      NSub = vert_emit(Sub, Data),
 	      maps:put(VId, NSub, Acc)
       end, #{}, Subs);
 out_vert(Subs, Value) when is_list(Subs) ->
-    NewSubs = 
+    NewSubs =
 	lists:map(
-	  fun(Sub) -> 
+	  fun(Sub) ->
 		  Data = proplists:get_value(Sub#subscription.subid, Value),
-		  vert_emit(Sub, Data) 
+		  vert_emit(Sub, Data)
 	  end, Subs),
     NewSubs.
 
@@ -249,7 +249,7 @@ request_all(Inports, pull) ->
     maybe_request_items(Inports, pull).
 maybe_request_items(_Inports, push) -> ok;
 maybe_request_items(Inports, pull) -> request_items(Inports).
-request_items(Inports) when is_list(Inports) -> 
+request_items(Inports) when is_list(Inports) ->
     [VPid ! {request, self()} || {_VId, VPid} <- Inports].
 
 %% ------------------------ for vertex build ------------------------------------
