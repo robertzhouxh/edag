@@ -230,9 +230,25 @@ reset_verts(T = #?T{}) ->
 
 from_gdef(GDefProps) ->
     case make_vertices(GDefProps) of
-        {ok, Verts} ->
-            T = #?T{},
-            ok = add_vertices(T, Verts),
+	{ok, Verts} ->
+	    G = new(),
+	    ok = add_vertices(G, Verts),
+	    case add_dependencies(G, Verts) of
+		ok ->
+		    ?LOG_DEBUG("Graph Succed: ~p~n", [G]),
+		    {ok, G};
+		{error, _} = Err ->
+		    Err
+	    end;
+	{error, _} = Err ->
+	    Err
+    end.
+
+from_gdef_origin(GDefProps) ->
+    case make_vertices(GDefProps) of
+	{ok, Verts} ->
+	    T = #?T{},
+	    ok = add_vertices(T, Verts),
             case add_dependencies(T, Verts) of
                 ok ->
                     {ok, T};
