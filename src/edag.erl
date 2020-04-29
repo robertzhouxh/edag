@@ -19,6 +19,7 @@
 -export([run_task/2]).
 -export([create_graph/2]).
 -export([start_graph/1, start_graph/3, stop_graph/1]).
+-export([from_gdef/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
