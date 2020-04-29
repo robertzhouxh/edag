@@ -21,6 +21,7 @@
 -export([start_graph/1, start_graph/3, stop_graph/1]).
 -export([from_gdef/1
 	 , destroy/1
+	 , child_done/2
 	 , is_acyclic/1
 	 , reset_verts/1
 	 , ready_verts/1
@@ -320,7 +321,6 @@ child_done(T = #?T{}, VId) ->
     V1 = edag_vert:done(Vert),
     add_vertex(T, Name, V1),
     T.
-
 
 %% TODO:
 start_verts_or_exit(State = #state{graph = G}) ->
